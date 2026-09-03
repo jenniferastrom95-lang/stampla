@@ -1,0 +1,525 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Stämpla</title>
+<link rel="manifest" href="manifest.json">
+<style>
+  :root {
+    --bg: #000000;
+    --fg: #f2f2f2;
+    --dim: #8a8a8a;
+    --line: #2a2a2a;
+    --red: #d71921;
+    --ok: #4caf50;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg); }
+  body {
+    font-family: 'Roboto Mono', ui-monospace, 'Cascadia Mono', monospace;
+    min-height: 100vh;
+    padding-bottom: 70px;
+  }
+  header {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 18px 20px 6px;
+    letter-spacing: 0.35em;
+    text-transform: uppercase;
+    font-size: 15px;
+  }
+  header .dot { color: var(--red); }
+  header .clock { margin-left: auto; letter-spacing: 0.1em; color: var(--dim); font-size: 13px; }
+  main { padding: 8px 20px 20px; max-width: 560px; margin: 0 auto; }
+
+  /* stämpelknappen */
+  #bigBtn {
+    width: 100%;
+    aspect-ratio: 2.2 / 1;
+    margin: 14px 0 6px;
+    background: var(--bg);
+    color: var(--fg);
+    border: 2px solid var(--fg);
+    border-radius: 18px;
+    font-family: inherit;
+    font-size: 26px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+  #bigBtn.in { border-color: var(--red); color: var(--red); }
+  #bigBtn:active { background: #111; }
+  #stateLine { text-align: center; color: var(--dim); font-size: 13px; letter-spacing: 0.15em; min-height: 18px; }
+
+  .card {
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 14px 16px;
+    margin: 14px 0;
+  }
+  .card h2 {
+    margin: 0 0 10px;
+    font-size: 12px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--dim);
+    font-weight: normal;
+  }
+  .row { display: flex; align-items: center; gap: 10px; margin: 8px 0; font-size: 15px; }
+  .row .lbl { color: var(--dim); width: 46px; flex-shrink: 0; font-size: 13px; letter-spacing: 0.1em; }
+  .row input[type=time] {
+    background: #111;
+    color: var(--fg);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 6px 8px;
+    font-family: inherit;
+    font-size: 15px;
+  }
+  .net { font-size: 30px; letter-spacing: 0.08em; margin: 4px 0 0; }
+  .net small { font-size: 13px; color: var(--dim); letter-spacing: 0.15em; }
+
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  button.chip {
+    background: #111;
+    color: var(--fg);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 8px 14px;
+    font-family: inherit;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  button.chip:active { border-color: var(--fg); }
+  input#customBreak {
+    width: 64px;
+    background: #111;
+    color: var(--fg);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 8px 10px;
+    font-family: inherit;
+    font-size: 14px;
+    text-align: center;
+  }
+  .breakList { list-style: none; margin: 8px 0 0; padding: 0; }
+  .breakList li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 5px 0;
+    font-size: 14px;
+    color: var(--dim);
+  }
+  .breakList button {
+    margin-left: auto;
+    background: none;
+    border: none;
+    color: var(--red);
+    font-family: inherit;
+    font-size: 16px;
+    cursor: pointer;
+    padding: 2px 8px;
+  }
+
+  /* statistik */
+  .week { margin: 16px 0; }
+  .week .whead {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    font-size: 13px;
+    letter-spacing: 0.12em;
+    margin-bottom: 8px;
+  }
+  .week .wtot { margin-left: auto; font-size: 16px; }
+  .week .wtot.over { color: var(--red); }
+  .bars { display: flex; gap: 6px; align-items: flex-end; height: 74px; }
+  .barCol { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .bar {
+    width: 100%;
+    background: #1c1c1c;
+    border-radius: 4px 4px 0 0;
+    position: relative;
+    min-height: 2px;
+  }
+  .bar .fill {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    background: var(--fg);
+    border-radius: 4px 4px 0 0;
+  }
+  .bar .fill.today { background: var(--red); }
+  .barCol .d { font-size: 10px; color: var(--dim); letter-spacing: 0.1em; }
+  .barCol .h { font-size: 10px; color: var(--dim); }
+
+  .settingsRow { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+  .settingsRow input {
+    width: 70px;
+    background: #111;
+    color: var(--fg);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 6px 8px;
+    font-family: inherit;
+    font-size: 14px;
+    text-align: center;
+  }
+
+  nav {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    display: flex;
+    background: var(--bg);
+    border-top: 1px solid var(--line);
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+  nav button {
+    flex: 1;
+    background: none;
+    border: none;
+    color: var(--dim);
+    font-family: inherit;
+    font-size: 12px;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    padding: 16px 0;
+    cursor: pointer;
+  }
+  nav button.active { color: var(--fg); }
+  nav button.active::after { content: " ●"; color: var(--red); font-size: 8px; vertical-align: middle; }
+  .hidden { display: none; }
+  .muted { color: var(--dim); font-size: 13px; }
+</style>
+</head>
+<body>
+<header>STÄMPLA<span class="dot">●</span><span class="clock" id="nowClock"></span></header>
+
+<main>
+  <section id="viewToday">
+    <button id="bigBtn">CHECKA IN</button>
+    <div id="stateLine"></div>
+
+    <div class="card">
+      <h2>I dag</h2>
+      <div class="row"><span class="lbl">IN</span><input type="time" id="inTime"></div>
+      <div class="row"><span class="lbl">UT</span><input type="time" id="outTime"></div>
+      <div class="row"><span class="lbl">NETTO</span><div class="net" id="todayNet">–</div></div>
+    </div>
+
+    <div class="card">
+      <h2>Rast</h2>
+      <div class="chips">
+        <button class="chip" data-min="15">+15</button>
+        <button class="chip" data-min="30">+30</button>
+        <button class="chip" data-min="45">+45</button>
+        <input id="customBreak" type="number" inputmode="numeric" placeholder="min">
+        <button class="chip" id="addCustom">Lägg till</button>
+        <button class="chip" id="liveBreak">Starta rast</button>
+      </div>
+      <ul class="breakList" id="breakList"></ul>
+    </div>
+  </section>
+
+  <section id="viewStats" class="hidden">
+    <div class="card">
+      <h2>Tidskonto</h2>
+      <div class="net" id="kontoNet">0h 00m</div>
+      <p class="muted">Timmar över normen, avslutade veckor. Veckor under norm räknas som noll — kontot kan bara växa.</p>
+    </div>
+    <div class="card">
+      <h2>Inställning</h2>
+      <div class="settingsRow">
+        Veckonorm <input id="normInput" type="number" inputmode="decimal" step="0.5"> timmar
+      </div>
+      <p class="muted" id="exportRow"><button class="chip" id="exportBtn">Exportera CSV</button></p>
+    </div>
+    <div id="weeks"></div>
+  </section>
+</main>
+
+<nav>
+  <button id="tabToday" class="active">I dag</button>
+  <button id="tabStats">Veckor</button>
+</nav>
+
+<script>
+"use strict";
+/* Stämpla — lokal stämpelklocka. All data bor i telefonens localStorage. */
+
+var KEY = "stampla_v1";
+var state = load();
+
+function load() {
+  try {
+    var raw = localStorage.getItem(KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {}
+  return { days: {}, norm: 35, liveBreakStart: null };
+}
+function save() {
+  try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
+}
+
+function dayKey(d) {
+  d = d || new Date();
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
+function today() {
+  var k = dayKey();
+  if (!state.days[k]) state.days[k] = { in: null, out: null, breaks: [] };
+  return state.days[k];
+}
+function fmtHM(mins) {
+  if (mins == null || isNaN(mins)) return "–";
+  var neg = mins < 0; mins = Math.abs(Math.round(mins));
+  var h = Math.floor(mins / 60), m = mins % 60;
+  return (neg ? "-" : "") + h + "h " + String(m).padStart(2, "0") + "m";
+}
+function tsToTimeStr(ts) {
+  if (!ts) return "";
+  var d = new Date(ts);
+  return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+}
+function timeStrToTs(str, baseKey) {
+  if (!str) return null;
+  var p = str.split(":");
+  var d = new Date(baseKey + "T00:00:00");
+  d.setHours(parseInt(p[0], 10), parseInt(p[1], 10), 0, 0);
+  return d.getTime();
+}
+function breaksTotal(day) {
+  var t = 0;
+  for (var i = 0; i < day.breaks.length; i++) t += day.breaks[i].min;
+  return t;
+}
+function netMinutes(day, key) {
+  if (!day.in) return null;
+  var end = day.out || (key === dayKey() ? Date.now() : null);
+  if (!end) return null;
+  return (end - day.in) / 60000 - breaksTotal(day);
+}
+
+/* ---------- i dag-vyn ---------- */
+var bigBtn = document.getElementById("bigBtn");
+var stateLine = document.getElementById("stateLine");
+var inTime = document.getElementById("inTime");
+var outTime = document.getElementById("outTime");
+var todayNet = document.getElementById("todayNet");
+var breakList = document.getElementById("breakList");
+var liveBreakBtn = document.getElementById("liveBreak");
+
+function renderToday() {
+  var k = dayKey(), d = today();
+  inTime.value = tsToTimeStr(d.in);
+  outTime.value = tsToTimeStr(d.out);
+
+  if (!d.in) {
+    bigBtn.textContent = "CHECKA IN";
+    bigBtn.className = "";
+    stateLine.textContent = "ostämplad";
+  } else if (!d.out) {
+    bigBtn.textContent = "CHECKA UT";
+    bigBtn.className = "in";
+    stateLine.textContent = "instämplad " + tsToTimeStr(d.in);
+  } else {
+    bigBtn.textContent = "ÅTERUPPTA";
+    bigBtn.className = "";
+    stateLine.textContent = "utstämplad " + tsToTimeStr(d.out);
+  }
+  if (state.liveBreakStart) {
+    var m = Math.round((Date.now() - state.liveBreakStart) / 60000);
+    liveBreakBtn.textContent = "Avsluta rast (" + m + " min)";
+    stateLine.textContent = "PÅ RAST";
+  } else {
+    liveBreakBtn.textContent = "Starta rast";
+  }
+
+  var net = netMinutes(d, k);
+  todayNet.innerHTML = net == null ? "–" : fmtHM(net) + (d.out ? "" : " <small>· pågår</small>");
+  if (breaksTotal(d) > 0 || d.breaks.length) {
+    todayNet.innerHTML += " <small>(rast " + breaksTotal(d) + " min)</small>";
+  }
+
+  breakList.innerHTML = "";
+  d.breaks.forEach(function (b, i) {
+    var li = document.createElement("li");
+    li.textContent = b.min + " min";
+    var x = document.createElement("button");
+    x.textContent = "×";
+    x.addEventListener("click", function () { d.breaks.splice(i, 1); save(); renderToday(); });
+    li.appendChild(x);
+    breakList.appendChild(li);
+  });
+}
+
+bigBtn.addEventListener("click", function () {
+  var d = today();
+  if (!d.in) d.in = Date.now();
+  else if (!d.out) {
+    if (state.liveBreakStart) endLiveBreak();
+    d.out = Date.now();
+  } else d.out = null; /* återuppta: jobbet fortsatte */
+  save(); renderToday();
+});
+inTime.addEventListener("change", function () { today().in = timeStrToTs(inTime.value, dayKey()); save(); renderToday(); });
+outTime.addEventListener("change", function () { today().out = timeStrToTs(outTime.value, dayKey()); save(); renderToday(); });
+
+document.querySelectorAll(".chip[data-min]").forEach(function (btn) {
+  btn.addEventListener("click", function () {
+    today().breaks.push({ min: parseInt(btn.dataset.min, 10) });
+    save(); renderToday();
+  });
+});
+document.getElementById("addCustom").addEventListener("click", function () {
+  var v = parseInt(document.getElementById("customBreak").value, 10);
+  if (v > 0) { today().breaks.push({ min: v }); document.getElementById("customBreak").value = ""; save(); renderToday(); }
+});
+function endLiveBreak() {
+  var m = Math.max(1, Math.round((Date.now() - state.liveBreakStart) / 60000));
+  today().breaks.push({ min: m });
+  state.liveBreakStart = null;
+}
+liveBreakBtn.addEventListener("click", function () {
+  if (state.liveBreakStart) endLiveBreak();
+  else state.liveBreakStart = Date.now();
+  save(); renderToday();
+});
+
+/* ---------- veckovyn ---------- */
+var DAY_NAMES = ["MÅ", "TI", "ON", "TO", "FR", "LÖ", "SÖ"];
+function mondayOf(d) {
+  d = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  var wd = (d.getDay() + 6) % 7;
+  d.setDate(d.getDate() - wd);
+  return d;
+}
+function isoWeek(d) {
+  var t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  var dayNum = (t.getUTCDay() + 6) % 7;
+  t.setUTCDate(t.getUTCDate() - dayNum + 3);
+  var firstThursday = new Date(Date.UTC(t.getUTCFullYear(), 0, 4));
+  var fDayNum = (firstThursday.getUTCDay() + 6) % 7;
+  firstThursday.setUTCDate(firstThursday.getUTCDate() - fDayNum + 3);
+  return 1 + Math.round((t - firstThursday) / 604800000);
+}
+function kontoMinutes() {
+  /* Överskott från AVSLUTADE veckor. Underskott räknas som noll — kontot kan bara växa. */
+  var normMin = state.norm * 60;
+  var thisMon = mondayOf(new Date()).getTime();
+  var weekSums = {};
+  Object.keys(state.days).forEach(function (k) {
+    var d = new Date(k + "T12:00:00");
+    var mon = mondayOf(d).getTime();
+    if (mon >= thisMon) return; /* pågående vecka räknas inte än */
+    var net = netMinutes(state.days[k], k);
+    if (net != null) weekSums[mon] = (weekSums[mon] || 0) + net;
+  });
+  var total = 0;
+  Object.keys(weekSums).forEach(function (m) { total += Math.max(0, weekSums[m] - normMin); });
+  return total;
+}
+
+function renderStats() {
+  document.getElementById("normInput").value = state.norm;
+  var konto = kontoMinutes();
+  var kontoEl = document.getElementById("kontoNet");
+  kontoEl.textContent = (konto > 0 ? "+" : "") + fmtHM(konto);
+  kontoEl.style.color = konto > 0 ? "var(--red)" : "var(--fg)";
+  var container = document.getElementById("weeks");
+  container.innerHTML = "";
+  var normMin = state.norm * 60;
+  var mon = mondayOf(new Date());
+  for (var w = 0; w < 8; w++) {
+    var start = new Date(mon); start.setDate(start.getDate() - 7 * w);
+    var weekTotal = 0, dayNets = [], any = false;
+    for (var i = 0; i < 7; i++) {
+      var d = new Date(start); d.setDate(d.getDate() + i);
+      var k = dayKey(d);
+      var rec = state.days[k];
+      var net = rec ? netMinutes(rec, k) : null;
+      if (net != null) { weekTotal += net; any = true; }
+      dayNets.push({ key: k, net: net });
+    }
+    if (!any && w > 0) continue;
+    var div = document.createElement("div");
+    div.className = "week card";
+    var over = weekTotal > normMin;
+    var head = document.createElement("div");
+    head.className = "whead";
+    head.innerHTML = "v." + isoWeek(start) +
+      " <span class='muted'>" + dayKey(start).slice(5) + " →</span>" +
+      "<span class='wtot" + (over ? " over" : "") + "'>" + fmtHM(weekTotal) +
+      " <span class='muted'>/ " + state.norm + "h</span></span>";
+    div.appendChild(head);
+    var bars = document.createElement("div");
+    bars.className = "bars";
+    var maxRef = Math.max(normMin / 5, 600);
+    dayNets.forEach(function (dn, i) {
+      var col = document.createElement("div"); col.className = "barCol";
+      var bar = document.createElement("div"); bar.className = "bar"; bar.style.height = "100%";
+      var fill = document.createElement("div"); fill.className = "fill" + (dn.key === dayKey() ? " today" : "");
+      var frac = dn.net ? Math.min(1, dn.net / maxRef) : 0;
+      fill.style.height = Math.round(frac * 100) + "%";
+      bar.appendChild(fill);
+      var lab = document.createElement("div"); lab.className = "d"; lab.textContent = DAY_NAMES[i];
+      var hrs = document.createElement("div"); hrs.className = "h"; hrs.textContent = dn.net ? (dn.net / 60).toFixed(1) : "";
+      col.appendChild(bar); col.appendChild(lab); col.appendChild(hrs);
+      bars.appendChild(col);
+    });
+    div.appendChild(bars);
+    container.appendChild(div);
+  }
+}
+document.getElementById("normInput").addEventListener("change", function () {
+  var v = parseFloat(this.value);
+  if (v > 0) { state.norm = v; save(); renderStats(); }
+});
+document.getElementById("exportBtn").addEventListener("click", function () {
+  var lines = ["datum;in;ut;rast_min;netto_min"];
+  Object.keys(state.days).sort().forEach(function (k) {
+    var d = state.days[k];
+    lines.push([k, tsToTimeStr(d.in), tsToTimeStr(d.out), breaksTotal(d), d.in && d.out ? Math.round(netMinutes(d, k)) : ""].join(";"));
+  });
+  var blob = new Blob([lines.join("\n")], { type: "text/csv" });
+  var a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "stampla.csv";
+  a.click();
+});
+
+/* ---------- flikar & klocka ---------- */
+var viewToday = document.getElementById("viewToday");
+var viewStats = document.getElementById("viewStats");
+var tabToday = document.getElementById("tabToday");
+var tabStats = document.getElementById("tabStats");
+tabToday.addEventListener("click", function () {
+  viewToday.classList.remove("hidden"); viewStats.classList.add("hidden");
+  tabToday.classList.add("active"); tabStats.classList.remove("active");
+  renderToday();
+});
+tabStats.addEventListener("click", function () {
+  viewStats.classList.remove("hidden"); viewToday.classList.add("hidden");
+  tabStats.classList.add("active"); tabToday.classList.remove("active");
+  renderStats();
+});
+
+function tick() {
+  var d = new Date();
+  document.getElementById("nowClock").textContent =
+    String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+  if (!viewToday.classList.contains("hidden")) renderToday();
+}
+setInterval(tick, 30000);
+tick();
+renderToday();
+
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js").catch(function () {});
+}
+</script>
+</body>
+</html>
