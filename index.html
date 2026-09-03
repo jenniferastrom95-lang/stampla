@@ -204,7 +204,8 @@
     <div id="stateLine"></div>
 
     <div class="card">
-      <h2>I dag</h2>
+      <h2 id="dayCardTitle">I dag</h2>
+      <div class="row"><span class="lbl">DAG</span><input type="date" id="editDate"></div>
       <div class="row"><span class="lbl">IN</span><input type="time" id="inTime"></div>
       <div class="row"><span class="lbl">UT</span><input type="time" id="outTime"></div>
       <div class="row"><span class="lbl">NETTO</span><div class="net" id="todayNet">–</div></div>
@@ -275,11 +276,13 @@ function dayKey(d) {
   d = d || new Date();
   return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
 }
-function today() {
-  var k = dayKey();
+var editKey = dayKey(); /* vilken dag kortet redigerar — normalt i dag, valbar för glömda dagar */
+function dayFor(k) {
   if (!state.days[k]) state.days[k] = { in: null, out: null, breaks: [] };
   return state.days[k];
 }
+function today() { return dayFor(dayKey()); }
+function editDay() { return dayFor(editKey); }
 function fmtHM(mins) {
   if (mins == null || isNaN(mins)) return "–";
   var neg = mins < 0; mins = Math.abs(Math.round(mins));
@@ -320,22 +323,26 @@ var breakList = document.getElementById("breakList");
 var liveBreakBtn = document.getElementById("liveBreak");
 
 function renderToday() {
-  var k = dayKey(), d = today();
+  var k = editKey, d = editDay();
+  var isToday = editKey === dayKey();
+  document.getElementById("editDate").value = editKey;
+  document.getElementById("dayCardTitle").textContent = isToday ? "I dag" : "Annan dag — " + editKey;
   inTime.value = tsToTimeStr(d.in);
   outTime.value = tsToTimeStr(d.out);
 
-  if (!d.in) {
+  var t = today(); /* stämpelknappen gäller alltid I DAG, oavsett vald redigeringsdag */
+  if (!t.in) {
     bigBtn.textContent = "CHECKA IN";
     bigBtn.className = "";
     stateLine.textContent = "ostämplad";
-  } else if (!d.out) {
+  } else if (!t.out) {
     bigBtn.textContent = "CHECKA UT";
     bigBtn.className = "in";
-    stateLine.textContent = "instämplad " + tsToTimeStr(d.in);
+    stateLine.textContent = "instämplad " + tsToTimeStr(t.in);
   } else {
     bigBtn.textContent = "ÅTERUPPTA";
     bigBtn.className = "";
-    stateLine.textContent = "utstämplad " + tsToTimeStr(d.out);
+    stateLine.textContent = "utstämplad " + tsToTimeStr(t.out);
   }
   if (state.liveBreakStart) {
     var m = Math.round((Date.now() - state.liveBreakStart) / 60000);
@@ -361,7 +368,7 @@ function renderToday() {
     var left = dailyNorm - net;
     if (left > 0) {
       var doneAt = new Date(Date.now() + left * 60000);
-      todayLeft.textContent = fmtHM(left) + (d.out ? "" : " · klar ca " + tsToTimeStr(doneAt.getTime()));
+      todayLeft.textContent = fmtHM(left) + (d.out || !isToday ? "" : " · klar ca " + tsToTimeStr(doneAt.getTime()));
       todayLeft.style.color = "var(--fg)";
     } else {
       todayLeft.textContent = "+" + fmtHM(-left) + " över dagsnormen";
@@ -390,18 +397,21 @@ bigBtn.addEventListener("click", function () {
   } else d.out = null; /* återuppta: jobbet fortsatte */
   save(); renderToday();
 });
-inTime.addEventListener("change", function () { today().in = timeStrToTs(inTime.value, dayKey()); save(); renderToday(); });
-outTime.addEventListener("change", function () { today().out = timeStrToTs(outTime.value, dayKey()); save(); renderToday(); });
+inTime.addEventListener("change", function () { editDay().in = timeStrToTs(inTime.value, editKey); save(); renderToday(); });
+outTime.addEventListener("change", function () { editDay().out = timeStrToTs(outTime.value, editKey); save(); renderToday(); });
+document.getElementById("editDate").addEventListener("change", function () {
+  if (this.value) { editKey = this.value; renderToday(); }
+});
 
 document.querySelectorAll(".chip[data-min]").forEach(function (btn) {
   btn.addEventListener("click", function () {
-    today().breaks.push({ min: parseInt(btn.dataset.min, 10) });
+    editDay().breaks.push({ min: parseInt(btn.dataset.min, 10) });
     save(); renderToday();
   });
 });
 document.getElementById("addCustom").addEventListener("click", function () {
   var v = parseInt(document.getElementById("customBreak").value, 10);
-  if (v > 0) { today().breaks.push({ min: v }); document.getElementById("customBreak").value = ""; save(); renderToday(); }
+  if (v > 0) { editDay().breaks.push({ min: v }); document.getElementById("customBreak").value = ""; save(); renderToday(); }
 });
 function endLiveBreak() {
   var m = Math.max(1, Math.round((Date.now() - state.liveBreakStart) / 60000));
