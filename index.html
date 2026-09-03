@@ -208,6 +208,7 @@
       <div class="row"><span class="lbl">IN</span><input type="time" id="inTime"></div>
       <div class="row"><span class="lbl">UT</span><input type="time" id="outTime"></div>
       <div class="row"><span class="lbl">NETTO</span><div class="net" id="todayNet">–</div></div>
+      <div class="row"><span class="lbl">KVAR</span><div class="net" id="todayLeft" style="font-size:18px">–</div></div>
     </div>
 
     <div class="card">
@@ -342,6 +343,24 @@ function renderToday() {
   todayNet.innerHTML = net == null ? "–" : fmtHM(net) + (d.out ? "" : " <small>· pågår</small>");
   if (breaksTotal(d) > 0 || d.breaks.length) {
     todayNet.innerHTML += " <small>(rast " + breaksTotal(d) + " min)</small>";
+  }
+
+  /* tidsskillnaden mot dagsnormen: kvar i dag + klar-klockslag, eller +över */
+  var todayLeft = document.getElementById("todayLeft");
+  var dailyNorm = state.norm * 60 / 5;
+  if (net == null) {
+    todayLeft.textContent = fmtHM(dailyNorm) + " (dagsnorm)";
+    todayLeft.style.color = "var(--dim)";
+  } else {
+    var left = dailyNorm - net;
+    if (left > 0) {
+      var doneAt = new Date(Date.now() + left * 60000);
+      todayLeft.textContent = fmtHM(left) + (d.out ? "" : " · klar ca " + tsToTimeStr(doneAt.getTime()));
+      todayLeft.style.color = "var(--fg)";
+    } else {
+      todayLeft.textContent = "+" + fmtHM(-left) + " över dagsnormen";
+      todayLeft.style.color = "var(--red)";
+    }
   }
 
   breakList.innerHTML = "";
