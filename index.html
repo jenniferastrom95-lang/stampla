@@ -236,7 +236,13 @@
       <div class="settingsRow">
         Veckonorm <input id="normInput" type="number" inputmode="decimal" step="0.5"> timmar
       </div>
-      <p class="muted" id="exportRow"><button class="chip" id="exportBtn">Exportera CSV</button></p>
+      <p class="muted" id="exportRow">
+        <button class="chip" id="exportBtn">Exportera CSV</button>
+        <button class="chip" id="backupBtn">Säkerhetskopia</button>
+        <button class="chip" id="restoreBtn">Återställ</button>
+        <input type="file" id="restoreFile" accept=".json" style="display:none">
+      </p>
+      <p class="muted" id="persistNote"></p>
     </div>
     <div id="weeks"></div>
   </section>
@@ -539,6 +545,45 @@ renderToday();
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").catch(function () {});
 }
+
+/* be webbläsaren skydda lagringen från automatisk rensning */
+if (navigator.storage && navigator.storage.persist) {
+  navigator.storage.persist().then(function (granted) {
+    var n = document.getElementById("persistNote");
+    if (n) n.textContent = granted ? "Lagring: skyddad från automatisk rensning ✓" : "Lagring: standard (ta säkerhetskopior då och då)";
+  }).catch(function () {});
+}
+
+/* full säkerhetskopia + återställning (JSON) */
+document.getElementById("backupBtn").addEventListener("click", function () {
+  var blob = new Blob([JSON.stringify(state)], { type: "application/json" });
+  var a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "stampla-backup-" + dayKey() + ".json";
+  a.click();
+});
+document.getElementById("restoreBtn").addEventListener("click", function () {
+  document.getElementById("restoreFile").click();
+});
+document.getElementById("restoreFile").addEventListener("change", function (ev) {
+  var f = ev.target.files[0];
+  if (!f) return;
+  var reader = new FileReader();
+  reader.onload = function () {
+    try {
+      var data = JSON.parse(reader.result);
+      if (!data || typeof data.days !== "object") throw new Error("fel format");
+      if (!window.confirm("Ersätta all nuvarande data med säkerhetskopian?")) return;
+      state = data;
+      save();
+      renderStats();
+      renderToday();
+    } catch (e) {
+      alert("Kunde inte läsa filen: " + e.message);
+    }
+  };
+  reader.readAsText(f);
+});
 </script>
 </body>
 </html>
