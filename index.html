@@ -94,6 +94,7 @@
     cursor: pointer;
   }
   button.chip:active { border-color: var(--fg); }
+  button.chip.on { border-color: var(--red); color: var(--red); }
   input#customBreak {
     width: 64px;
     background: #111;
@@ -213,6 +214,16 @@
     </div>
 
     <div class="card">
+      <h2>Frånvaro</h2>
+      <div class="chips">
+        <button class="chip" data-typ="ledig">Ledig</button>
+        <button class="chip" data-typ="vab">Vab</button>
+        <button class="chip" data-typ="sjuk">Sjuk</button>
+      </div>
+      <p class="muted" id="typNote">Hel frånvarodag räknas som en dagsnorm i veckan. Stämplar du också räknas den jobbade tiden.</p>
+    </div>
+
+    <div class="card">
       <h2>Rast</h2>
       <div class="chips">
         <button class="chip" data-min="15">+15</button>
@@ -312,6 +323,17 @@ function netMinutes(day, key) {
   if (!end) return null;
   return (end - day.in) / 60000 - breaksTotal(day);
 }
+var TYP_LABEL = { ledig: "L", vab: "V", sjuk: "S" };
+function dailyNormMin() { return state.norm * 60 / 5; }
+function countedMinutes(day, key) {
+  /* dagens värde i veckosummorna: stämplad tid om den finns, annars en
+     dagsnorm för hel frånvarodag (ledig/vab/sjuk). Stämpling + typ =
+     deldag: bara jobbad tid räknas, typen syns som markering. */
+  var net = netMinutes(day, key);
+  if (net != null) return net;
+  if (day.typ) return dailyNormMin();
+  return null;
+}
 
 /* ---------- i dag-vyn ---------- */
 var bigBtn = document.getElementById("bigBtn");
@@ -352,16 +374,29 @@ function renderToday() {
     liveBreakBtn.textContent = "Starta rast";
   }
 
+  /* frånvarochipsen speglar vald dags typ */
+  document.querySelectorAll(".chip[data-typ]").forEach(function (btn) {
+    btn.className = "chip" + (d.typ === btn.dataset.typ ? " on" : "");
+  });
+
   var net = netMinutes(d, k);
   todayNet.innerHTML = net == null ? "–" : fmtHM(net) + (d.out ? "" : " <small>· pågår</small>");
+  if (net == null && d.typ) {
+    todayNet.innerHTML = fmtHM(dailyNormMin()) + " <small>· " + d.typ + "</small>";
+  } else if (net != null && d.typ) {
+    todayNet.innerHTML += " <small>· deldag " + d.typ + "</small>";
+  }
   if (breaksTotal(d) > 0 || d.breaks.length) {
     todayNet.innerHTML += " <small>(rast " + breaksTotal(d) + " min)</small>";
   }
 
   /* tidsskillnaden mot dagsnormen: kvar i dag + klar-klockslag, eller +över */
   var todayLeft = document.getElementById("todayLeft");
-  var dailyNorm = state.norm * 60 / 5;
-  if (net == null) {
+  var dailyNorm = dailyNormMin();
+  if (net == null && d.typ) {
+    todayLeft.textContent = "frånvarodag — räknas som dagsnorm";
+    todayLeft.style.color = "var(--dim)";
+  } else if (net == null) {
     todayLeft.textContent = fmtHM(dailyNorm) + " (dagsnorm)";
     todayLeft.style.color = "var(--dim)";
   } else {
@@ -409,6 +444,13 @@ document.querySelectorAll(".chip[data-min]").forEach(function (btn) {
     save(); renderToday();
   });
 });
+document.querySelectorAll(".chip[data-typ]").forEach(function (btn) {
+  btn.addEventListener("click", function () {
+    var d = editDay();
+    d.typ = d.typ === btn.dataset.typ ? null : btn.dataset.typ; /* klick igen tar bort */
+    save(); renderToday();
+  });
+});
 document.getElementById("addCustom").addEventListener("click", function () {
   var v = parseInt(document.getElementById("customBreak").value, 10);
   if (v > 0) { editDay().breaks.push({ min: v }); document.getElementById("customBreak").value = ""; save(); renderToday(); }
@@ -450,7 +492,7 @@ function kontoMinutes() {
     var d = new Date(k + "T12:00:00");
     var mon = mondayOf(d).getTime();
     if (mon >= thisMon) return; /* pågående vecka räknas inte än */
-    var net = netMinutes(state.days[k], k);
+    var net = countedMinutes(state.days[k], k);
     if (net != null) weekSums[mon] = (weekSums[mon] || 0) + net;
   });
   var total = 0;
@@ -475,9 +517,9 @@ function renderStats() {
       var d = new Date(start); d.setDate(d.getDate() + i);
       var k = dayKey(d);
       var rec = state.days[k];
-      var net = rec ? netMinutes(rec, k) : null;
+      var net = rec ? countedMinutes(rec, k) : null;
       if (net != null) { weekTotal += net; any = true; }
-      dayNets.push({ key: k, net: net });
+      dayNets.push({ key: k, net: net, typ: rec ? rec.typ : null, worked: rec ? netMinutes(rec, k) : null });
     }
     if (!any && w > 0) continue;
     var div = document.createElement("div");
@@ -499,9 +541,12 @@ function renderStats() {
       var fill = document.createElement("div"); fill.className = "fill" + (dn.key === dayKey() ? " today" : "");
       var frac = dn.net ? Math.min(1, dn.net / maxRef) : 0;
       fill.style.height = Math.round(frac * 100) + "%";
+      if (dn.typ && dn.worked == null) fill.style.background = "#555"; /* hel frånvarodag: dämpad stapel */
       bar.appendChild(fill);
       var lab = document.createElement("div"); lab.className = "d"; lab.textContent = DAY_NAMES[i];
-      var hrs = document.createElement("div"); hrs.className = "h"; hrs.textContent = dn.net ? (dn.net / 60).toFixed(1) : "";
+      var hrs = document.createElement("div"); hrs.className = "h";
+      hrs.textContent = dn.typ ? TYP_LABEL[dn.typ] + (dn.worked != null ? " " + (dn.worked / 60).toFixed(1) : "")
+                               : (dn.net ? (dn.net / 60).toFixed(1) : "");
       col.appendChild(bar); col.appendChild(lab); col.appendChild(hrs);
       bars.appendChild(col);
     });
@@ -514,10 +559,10 @@ document.getElementById("normInput").addEventListener("change", function () {
   if (v > 0) { state.norm = v; save(); renderStats(); }
 });
 document.getElementById("exportBtn").addEventListener("click", function () {
-  var lines = ["datum;in;ut;rast_min;netto_min"];
+  var lines = ["datum;in;ut;rast_min;netto_min;typ"];
   Object.keys(state.days).sort().forEach(function (k) {
     var d = state.days[k];
-    lines.push([k, tsToTimeStr(d.in), tsToTimeStr(d.out), breaksTotal(d), d.in && d.out ? Math.round(netMinutes(d, k)) : ""].join(";"));
+    lines.push([k, tsToTimeStr(d.in), tsToTimeStr(d.out), breaksTotal(d), d.in && d.out ? Math.round(netMinutes(d, k)) : "", d.typ || ""].join(";"));
   });
   var blob = new Blob([lines.join("\n")], { type: "text/csv" });
   var a = document.createElement("a");

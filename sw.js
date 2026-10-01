@@ -1,5 +1,5 @@
 /* Stämpla service worker — cachar appen för offline. */
-var CACHE = "stampla-v1";
+var CACHE = "stampla-v2";
 var FILES = ["./", "./index.html", "./manifest.json", "./icon.svg"];
 
 self.addEventListener("install", function (e) {
